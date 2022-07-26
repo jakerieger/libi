@@ -1,3 +1,0 @@
-/home/jake/Code/GitHub/libi/test_project/build/CMakeFiles/test.dir
-/home/jake/Code/GitHub/libi/test_project/build/CMakeFiles/edit_cache.dir
-/home/jake/Code/GitHub/libi/test_project/build/CMakeFiles/rebuild_cache.dir
