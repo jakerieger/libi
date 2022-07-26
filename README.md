@@ -30,7 +30,7 @@ Run the following command in your command line:
 ```bash
 $ curl --proto '=https' --tlsv1.2 -sSf https://github.com/jakerieger/libi/releases/download/latest/install-linux.sh | sh
 ```
-> **Note**: We recommend **never** blindling running shell scripts downloaded from the internet. Please verify the contents of the above script before executing it.
+> **Note**: We recommend **never** blindly running shell scripts downloaded from the internet. Please verify the contents of the above script before executing it.
 
 ### Building from source
 Libi is written in Rust so you'll need the Rust buildchain in order to build Libi from source. 
