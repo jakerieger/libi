@@ -6,6 +6,9 @@ use std::path::PathBuf;
 use platform_dirs::AppDirs;
 use std::io::Error;
 use std::fs;
+use crate::config;
+
+pub mod build_lib;
 
 pub fn get_libi_data_path() -> PathBuf {
     let app_dir = AppDirs::new(Some("libi"), true).unwrap();
@@ -67,6 +70,33 @@ pub fn get_cache_dir() -> PathBuf {
     return cache_dir
 }
 
+pub fn create_config_file() -> Result<(), Error> {
+    let default_config = config::LibiConfig {
+        compiler: String::from("config"),
+    };
+
+    let config_path = AppDirs::new(Some("libi"), true).unwrap();
+    let config_file_path = config_path.config_dir.join("libi.json");
+    fs::create_dir(&config_path.config_dir).unwrap();
+
+    let result = fs::write(&config_file_path.as_path(), serde_json::to_string_pretty(&default_config).unwrap());
+    return result
+}
+
+pub fn get_config_path() -> PathBuf {
+    let config_path = AppDirs::new(Some("libi"), true).unwrap();
+    let config_file_path = config_path.config_dir.join("libi.json");
+    return config_file_path
+}
+
+pub fn get_config() -> config::LibiConfig {
+    let config_path = AppDirs::new(Some("libi"), true).unwrap();
+    let config_file_path = config_path.config_dir.join("libi.json");
+    let config_str = fs::read_to_string(config_file_path).unwrap();
+    let config = serde_json::from_str::<config::LibiConfig>(&config_str).unwrap();
+    return config
+}
+
 pub enum ErrorLevel {
     ErrorLevel_Info,
     ErrorLevel_Warn,
@@ -79,18 +109,36 @@ pub fn print_usage() {
 Libi - The common sense package manager for modern C++ projects.
 
 Usage:
-    libi [command]
+    libi [command] [options]
 
 Available Commands:
-    add         Install a package to the current project directory
-    config      Set global configuration options for Libi
-    freeze      Freeze version numbers of all packages installed in project
-    help        Show help for Libi
-    rebuild     Rebuild all installed packages in project
-    remove      Remove a package from the current project
-    version     Print the currently installed version of Libi
+    add       Install a package to the current project directory and build with the following type
+    config    Set global configuration options for Libi
+    freeze    Export dependencies list to .libs file
+    init      Create a new Libi-configured C++ project
+    help      Show help for Libi
+    rebuild   Rebuild all installed packages in project
+    remove    Remove a package from the current project
+    version   Print the currently installed version of Libi
 
 Use "libi [command] --help" for more information about a command.
+    "#;
+
+    println!("{}", usage_str);
+}
+
+pub fn print_command_add_usage() {
+        let usage_str = r#"
+Usage:
+    libi add <repo> <build_type>
+
+Example:
+    libi add https://github.com/glfw/glfw.git static
+
+Parameters:
+    repo         URL of the git repo for the library to add
+    build_type   Type of library to build ('static', 'dynamic', or 'header-only')
+
     "#;
 
     println!("{}", usage_str);
@@ -100,28 +148,28 @@ pub fn print_error(msg: &str, level: ErrorLevel, print_help: bool) {
     match level {
         ErrorLevel::ErrorLevel_Info => {
             println!(
-                "{}: {}",
+                "{}  - {}",
                 format!("{}", "[INFO]").bold().bright_blue(),
                 msg
             );
         },
         ErrorLevel::ErrorLevel_Warn => {
             println!(
-                "{}: {}",
+                "{}  - {}",
                 format!("{}", "[WARN]").bold().yellow(),
                 msg
             );
         },
         ErrorLevel::ErrorLevel_Error => {
             println!(
-                "{}: {}",
+                "{} - {}",
                 format!("{}", "[ERROR]").bold().red(),
                 msg
             );
         },
         ErrorLevel::ErrorLevel_Fatal => {
             println!(
-                "{}: {}",
+                "{} - {}",
                 format!("{}", "[FATAL]").bold().bright_red(),
                 msg
             );
@@ -135,7 +183,7 @@ pub fn print_error(msg: &str, level: ErrorLevel, print_help: bool) {
 
 pub fn print_status(msg: &str) {
     println!(
-        "{} - {}",
+        "{}  - {}",
         format!("{}", "[Libi]").bold().cyan(),
         msg
     );

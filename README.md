@@ -40,7 +40,7 @@ With the Rust buildchain installed, you can clone the repo, `cd` in to the proje
 $ cargo build --release
 ```
 
-One finished executing, the binary can be found in the `targets/release` directory inside the project root. You can then copy this to whatever directory you desire and add it to your $PATH environment variable.
+Once finished executing, the binary can be found in the `targets/release` directory inside the project root. You can then copy this to whatever directory you desire and add it to your $PATH environment variable.
 
 ## Quickstart
 
