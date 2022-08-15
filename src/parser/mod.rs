@@ -1,10 +1,19 @@
-use std::process::Command;
+use console::{style, Emoji};
 use std::path::PathBuf;
-use colored::Colorize;
+use std::process::Command;
 
-use crate::utils::*;
+use crate::config::LibiConfig;
+use crate::utils::{*, self};
 
-pub fn parse_add(args: &Vec<String>, cache_dir: &mut PathBuf) {
+pub mod cmake;
+
+static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍  ", "");
+static TRUCK: Emoji<'_, '_> = Emoji("🚚  ", "");
+static CLIP: Emoji<'_, '_> = Emoji("🔗  ", "");
+static PAPER: Emoji<'_, '_> = Emoji("📃  ", "");
+static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", ":-)");
+
+pub fn parse_add(args: &Vec<String>, cache_dir: &mut PathBuf, config: &LibiConfig) {
     let repo = args.get(1).unwrap();
     let repo_name = repo.split('/').last().unwrap().rsplit_once('.').unwrap().0;
 
@@ -12,7 +21,18 @@ pub fn parse_add(args: &Vec<String>, cache_dir: &mut PathBuf) {
     repo_dir.push(&cache_dir);
     repo_dir.push(&repo_name);
 
-    print_status(format!("Cloning repo: {}", &repo).as_str());
+    println!(
+        "{} {}Resolving repository...",
+        style("[1/4]").bold().dim(),
+        LOOKING_GLASS
+    );
+
+    println!(
+        "{} {}Cloning repository...",
+        style("[2/4]").bold().dim(),
+        TRUCK
+    );
+
     Command::new("git")
         .arg("-C")
         .arg(&cache_dir.as_os_str().to_str().unwrap())
@@ -21,46 +41,18 @@ pub fn parse_add(args: &Vec<String>, cache_dir: &mut PathBuf) {
         .output()
         .expect("Failed to clone git repo");
 
-    // Build type specified
-    if args.len() == 3 {
-        let build_type = args.get(2).unwrap().as_str();
+    println!(
+        "{} {}Building library...",
+        style("[3/4]").bold().dim(),
+        PAPER
+    );
 
-        match build_type {
-            "static" => {
-                print_status(
-                    format!("Using build type: {}", "static").bold().to_string().as_str()
-                );
-
-                build_lib::build(build_lib::BuildType::BuildType_Static, &repo_dir);
-            },
-            "dynamic" => {
-                print_status(
-                    format!("Using build type: {}", "dynamic").bold().to_string().as_str()
-                );
-
-                build_lib::build(build_lib::BuildType::BuildType_Dynamic, &repo_dir);
-            },
-            "header" => {
-                print_status(
-                    format!("Using build type: {}", "header").bold().to_string().as_str()
-                );
-
-                build_lib::build(build_lib::BuildType::BuildType_HeaderOnly, &repo_dir);
-            },
-            _ => {
-                print_error(
-                    format!("Invalid build type specifier: '{}'", &build_type).as_str(), 
-                    ErrorLevel::ErrorLevel_Fatal, 
-                    false
-                );
-                return
-            }
-        }
-    } else { // Use default 'static'
-        print_error(
-            format!("No build type provided. Using default: {}", "static").bold().to_string().as_str(), 
-            ErrorLevel::ErrorLevel_Warn, 
-            false
-        );
+    match utils::build_lib::build(&repo_dir, config) {
+        Ok(_) => {
+            println!("{} {}Linking library...", style("[4/4]").bold().dim(), CLIP);
+        },
+        Err(e) => {
+            panic!("{}", e.to_string());
+        },
     }
 }

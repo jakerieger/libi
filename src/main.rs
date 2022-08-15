@@ -1,37 +1,40 @@
 #![allow(dead_code)]
 
-use std::env::args;
+use regex::Regex;
 use std::path::Path;
+use std::{env::args, fs};
 
-use colored::Colorize;
-
-mod utils;
-mod parser;
 mod config;
+mod parser;
+mod utils;
 
-struct Flags {
-    compiler: String,
-    clean_cache_on_install: u16
-}
+use utils::{usage, usage::Cmd};
 
 fn main() {
     let data_path = utils::get_libi_data_path();
+    // Create directories used by Libi if missing
     if !Path::exists(&data_path.as_path()) {
         utils::create_libi_data_dirs(&data_path);
     }
+    // --------------------------------------------
 
-    if !Path::exists(&utils::get_config_path().as_path()) {
-        utils::create_config_file().unwrap();
+    let config = config::LibiConfig::read_from_project();
+
+    // Check for libi.conf.json in project root
+    if !Path::new("./libi.conf.json").exists() {
+        utils::print_error(
+            "This project has no Libi configuration. Create one now? (Y|n)",
+            utils::ErrorLevel::ErrorLevel_Info,
+            false,
+        );
     }
-
-    let config = utils::get_config();
 
     let mut argv: Vec<String> = args().collect();
     argv.remove(0); // Remove first arg since it's just the executable name
 
     if argv.len() < 1 {
         utils::print_usage();
-        return
+        return;
     }
 
     if argv.len() > 1 {
@@ -39,11 +42,72 @@ fn main() {
         // and abort if not
         if !Path::new("./CMakeLists.txt").exists() {
             utils::print_error(
-                "Current directory is not a C++ project",
+                "Current directory is not a CMake C++ project",
                 utils::ErrorLevel::ErrorLevel_Fatal,
-                false
+                false,
             );
-            return
+            return;
+        } else {
+            // Update CMakeLists.txt if missing Libi config vars
+            let mut made_changes = false;
+            let cmake_lists_path = Path::new("./CMakeLists.txt");
+            let cmake_lists_content = fs::read_to_string(cmake_lists_path).unwrap();
+            let mut lines: Vec<&str> = cmake_lists_content.split("\n").into_iter().collect();
+
+            let libi_root = format!(
+                "\nset(LIBI_ROOT \"{}\")",
+                utils::get_libi_data_path().as_path().to_str().unwrap()
+            );
+            let libi_root_str = libi_root.clone();
+
+            let re = Regex::new(r"(?m)^set\(LIBI_ROOT").unwrap();
+            if !re.is_match(cmake_lists_content.as_str()) {
+                lines.insert(1, libi_root_str.as_str());
+            }
+
+            let re = Regex::new(r"(?m)^include_directories").unwrap();
+            if !re.is_match(cmake_lists_content.as_str()) {
+                let mut index = 0;
+                for line in lines.clone() {
+                    if line.starts_with("project(") {
+                        lines.insert(
+                            index + 1,
+                            r#"
+include_directories(
+    ${LIBI_ROOT}/include
+)"#,
+                        );
+                        made_changes = true;
+                        break;
+                    }
+                    index += 1;
+                }
+                let re = Regex::new(r"(?m)^ *\$\{LIBI_ROOT\}/include").unwrap();
+                if !re.is_match(cmake_lists_content.as_str()) {
+                    let mut insert_index = 0usize;
+                    let mut found_include_dirs_loc = false;
+                    for line in lines.clone() {
+                        if line.starts_with("include_directories(") {
+                            found_include_dirs_loc = true;
+                        }
+
+                        if line.starts_with(")") && found_include_dirs_loc {
+                            break;
+                        }
+
+                        insert_index += 1;
+                    }
+
+                    lines.insert(insert_index, "    ${LIBI_ROOT}/include");
+                    made_changes = true;
+                }
+            }
+
+            // Write changes back to CMakeLists.txt
+            if made_changes {
+                let output = lines.join("\n");
+                let _ = fs::write(cmake_lists_path, output);
+            }
         }
     }
 
@@ -52,43 +116,43 @@ fn main() {
         "add" => {
             if argv.len() < 2 {
                 utils::print_error(
-                    "No package repo provided", 
-                    utils::ErrorLevel::ErrorLevel_Fatal, 
-                    false
+                    "No package repo provided",
+                    utils::ErrorLevel::ErrorLevel_Fatal,
+                    false,
                 );
 
-                utils::print_command_add_usage();
+                usage::print_cmd_usage(Cmd::add);
 
-                return
+                return;
             }
 
             // Validate that a URL was passed
             if !&argv.get(1).unwrap().contains(".git") {
                 utils::print_error(
-                    "The provided URL is not recognized as a git repository", 
-                    utils::ErrorLevel::ErrorLevel_Error, 
-                    true
+                    "The provided URL is not recognized as a git repository",
+                    utils::ErrorLevel::ErrorLevel_Error,
+                    true,
                 );
-                return
+                return;
             }
 
-            parser::parse_add(&argv, &mut utils::get_cache_dir());
-        },
-        "config" => {},
-        "help" => {},
-        "init" => {},
-        "remove" => {},
-        "freeze" => {},
-        "rebuild" => {},
-        "version" => {},
+            parser::parse_add(&argv, &mut utils::get_cache_dir(), &config);
+        }
+        "config" => {}
+        "help" => {}
+        "init" => {}
+        "remove" => {}
+        "freeze" => {}
+        "rebuild" => {}
+        "version" => {}
         _ => {
             utils::print_error(
-                format!("Invalid command provided: '{}'", cmd).as_str(), 
-                utils::ErrorLevel::ErrorLevel_Fatal, 
-                true
+                format!("Invalid command provided: '{}'", cmd).as_str(),
+                utils::ErrorLevel::ErrorLevel_Fatal,
+                true,
             );
 
-            return
+            return;
         }
     }
 }

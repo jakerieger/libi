@@ -1,39 +1,29 @@
+use crate::utils::print_status;
+use std::fs;
 use std::io::Error;
 use std::path::PathBuf;
-use std::process::Command;
-use std::fs;
-use crate::utils::print_status;
 
-pub enum BuildType {
-    BuildType_Static,
-    BuildType_Dynamic,
-    BuildType_HeaderOnly,
-}
+use crate::parser::cmake::CMakeConfig;
+use crate::utils::config::LibiConfig;
 
-pub fn build(build_type: BuildType, repo_dir: &PathBuf) {
+pub fn build(repo_dir: &PathBuf, config: &LibiConfig) -> Result<(), Error> {
     print_status("Building library...");
 
     let mut repo_dir_mut = repo_dir.clone();
     repo_dir_mut.push("build");
-    let _ : Result<(), Error> = fs::create_dir(&repo_dir_mut);
+    let _: Result<(), Error> = fs::create_dir(&repo_dir_mut);
 
-    match build_type {
-        BuildType::BuildType_Static => {
-            Command::new("cmake")
-                .arg("-B")
-                .arg(&repo_dir_mut.to_str().unwrap())
-                .arg("-S")
-                .arg(repo_dir.to_str().unwrap())
-                .output()
-                .expect("CMake project configuration failed");
+    let cmake_config = CMakeConfig::new_from_libi_conf(
+        config,
+        repo_dir_mut,
+        repo_dir.to_owned()
+    );
 
-            Command::new("cmake")
-                .arg(&repo_dir_mut.to_str().unwrap())
-                .arg("--build")
-                .output()
-                .expect("CMake build command failed");
+    match cmake_config.config() {
+        Ok(_) => {
+            cmake_config.build();
+            Ok(())
         },
-        BuildType::BuildType_Dynamic => {},
-        BuildType::BuildType_HeaderOnly => {},
+        Err(e) => Err(e)
     }
 }
